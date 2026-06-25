@@ -17,7 +17,7 @@ _start:
 
     // Config VTOR & MSPLIM register
     ldr r0, =SCB_BASE
-    ldr r1, =_exception_vector
+    ldr r1, =_secure_exception_vector
     str r1, [r0, #SCB_VTOR_OFF]
     // Read the MSP from vector table
     ldr r1, [r1]

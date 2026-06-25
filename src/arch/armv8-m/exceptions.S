@@ -19,8 +19,8 @@
 .endm
 
 .balign 0x1000
-.global _exception_vector
-_exception_vector:
+.global _secure_exception_vector
+_secure_exception_vector:
     .word _stack_top
     .word _start
     .rept 13

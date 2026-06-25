@@ -14,6 +14,7 @@
 
 /* System Control Block */
 #define SCB_BASE                 (0xE000ED00UL)
+#define SCB_BASE_NS              (0xE002ED00UL)
 
 #define SCB_VTOR_OFF             (8)
 #define SCB_SHCSR_OFF            (36)
@@ -33,6 +34,7 @@
 
 #ifndef __ASSEMBLER__
 static struct scb* const scb = (struct scb*)SCB_BASE;
+static struct scb* const scb_ns = (struct scb*)SCB_BASE_NS;
 
 struct scb {
     volatile const uint32_t cpuid;

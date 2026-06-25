@@ -66,12 +66,12 @@ void lpc_uart_init(volatile fc_uart_t* uart)
     iocon_init();
 
     // Configure RXD pin
-    iocon_pin_cfg(port1, pin24,
+    iocon_pin_cfg(UART_RX_PORT, UART_RX_PIN,
         IOCON_PIO_FUNC(1) | IOCON_PIO_MODE_INACT | IOCON_PIO_SLEW_STANDARD | IOCON_PIO_INV_DI |
             IOCON_PIO_DIGITAL_EN | IOCON_PIO_OPENDRAIN_DI);
 
     // Configure TXD pin
-    iocon_pin_cfg(port0, pin27,
+    iocon_pin_cfg(UART_TX_PORT, UART_TX_PIN,
         IOCON_PIO_FUNC(1) | IOCON_PIO_MODE_INACT | IOCON_PIO_SLEW_STANDARD | IOCON_PIO_INV_DI |
             IOCON_PIO_DIGITAL_EN | IOCON_PIO_OPENDRAIN_DI);
 
