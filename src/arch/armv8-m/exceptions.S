@@ -28,7 +28,7 @@ _exception_vector:
     .endr
     .word _systick_handler
     /* Interrupts */
-    .rept 50
+    .rept IRQ_NUM
     .word _irq_handler
     .endr
 

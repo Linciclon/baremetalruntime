@@ -10,8 +10,7 @@
 #include <syscon.h>
 #include <plat.h>
 
-#define FC2_BASE      PLAT_UART_ADDR
-#define UART2         FC2_BASE
+#define UART         PLAT_UART_ADDR
 
 #define UART_BAUDRATE 115200U
 #if (UART_BAUDRATE == 115200)
@@ -111,7 +110,7 @@ struct fc_uart {
 
 typedef volatile struct fc_uart fc_uart_t;
 
-static struct fc_cfg* const fc2_cfg_s = (struct fc_cfg*)UART2;
+static struct fc_cfg* const fc_cfg_s = (struct fc_cfg*)UART;
 
 void lpc_uart_init(volatile fc_uart_t* uart);
 void lpc_uart_putc(volatile fc_uart_t* uart, int8_t str);

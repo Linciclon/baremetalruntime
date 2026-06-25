@@ -7,6 +7,7 @@
 #include <lpc_uart.h>
 #include <iocon.h>
 #include <syscon.h>
+#include <plat.h>
 
 typedef enum {
     NONE,
@@ -17,25 +18,25 @@ typedef enum {
     I2S_RX,
 } fc_cfg_t;
 
-static void fc2_clk_init(void)
+static void fc_clk_init(void)
 {
     // Configure FR0 12MHz to FLEXCOMM0
-    syscon_clk_src(FCCLKSEL2, SYSCON_FCCLKSEL_FRO12M);
+    syscon_clk_src(FCCLKSEL, SYSCON_FCCLKSEL_FRO12M);
 
     // Enable clock
-    syscon_enable_clk(AHBCLKCTRL1, SYSCON_AHBCLKTRL1_FC2);
+    syscon_enable_clk(AHBCLKCTRL1, SYSCON_AHBCLKTRL1);
 }
 
-static void fc2_init(volatile fc_uart_t* uart)
+static void fc_init(volatile fc_uart_t* uart)
 {
     // Configure Flexcomm0 clock
-    fc2_clk_init();
+    fc_clk_init();
 
     // Reset peripheral
-    syscon_rst_sign(FC2_RST);
+    syscon_rst_sign(FCRST);
 
     // Set and lock Flexcomm0 to UART
-    fc2_cfg_s->pselid = USART | FC_PSELID_LOCK;
+    fc_cfg_s->pselid = USART | FC_PSELID_LOCK;
 
     // Empty and enable txFIFO
     uart->fifocfg |= FCUART_FIFOCFG_EMPTYTX | FCUART_FIFOCFG_ENABLETX;
@@ -66,17 +67,17 @@ void lpc_uart_init(volatile fc_uart_t* uart)
     iocon_init();
 
     // Configure RXD pin
-    iocon_pin_cfg(port1, pin24,
+    iocon_pin_cfg(UART_RX_PORT, UART_RX_PIN,
         IOCON_PIO_FUNC(1) | IOCON_PIO_MODE_INACT | IOCON_PIO_SLEW_STANDARD | IOCON_PIO_INV_DI |
             IOCON_PIO_DIGITAL_EN | IOCON_PIO_OPENDRAIN_DI);
 
     // Configure TXD pin
-    iocon_pin_cfg(port0, pin27,
+    iocon_pin_cfg(UART_TX_PORT, UART_TX_PIN,
         IOCON_PIO_FUNC(1) | IOCON_PIO_MODE_INACT | IOCON_PIO_SLEW_STANDARD | IOCON_PIO_INV_DI |
             IOCON_PIO_DIGITAL_EN | IOCON_PIO_OPENDRAIN_DI);
 
     // Initialize the flexcomm dev with uart configurations
-    fc2_init(uart);
+    fc_init(uart);
 }
 
 void lpc_uart_putc(volatile fc_uart_t* uart, int8_t c)
