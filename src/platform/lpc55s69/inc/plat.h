@@ -12,6 +12,10 @@
 #define PLAT_CODE_MEM_BASE  0x10000000
 #define PLAT_CODE_MEM_SIZE  0x10000
 
+#define PLAT_NSC_BASE       0x1000F000
+#define PLAT_NSC_SIZE       0x1000
+#define PLAT_NSC_DWT_PROBE_ADDR PLAT_NSC_BASE
+
 #define PLAT_MEM_BASE       0x30000000
 #define PLAT_MEM_SIZE       0x8000
 
@@ -21,7 +25,8 @@
 
 #define STACK_SIZE          0x4000
 
-#define PLAT_TIMER_FREQ     12000000ULL           
+#define PLAT_TIMER_FREQ     150000000ULL
+#define PLAT_DWT_FREQ       150000000ULL
 
 #define PLAT_MAX_INTERRUPTS 75
 

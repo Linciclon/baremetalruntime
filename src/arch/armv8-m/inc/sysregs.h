@@ -88,10 +88,14 @@ struct scb {
 static struct systick* const systick = (struct systick*)SYSTICK_BASE;
 
 struct systick {
-    volatile uint32_t csr;
-    volatile uint32_t rvr;
-    volatile uint32_t cvr;
-    volatile const uint32_t calib;
+    volatile uint32_t csr;          //CTRL 
+                                        // bit 0  ENABLE      SysTick enable
+                                        // bit 1  TICKINT     SysTick exception enable
+                                        // bit 2  CLKSOURCE   Clock source
+                                        // bit 16 COUNTFLAG   Set quando o contador chegou a 0
+    volatile uint32_t rvr;          //LOAD
+    volatile uint32_t cvr;          //VAL
+    volatile const uint32_t calib;  //CALIB
 };
 #endif /* |__ASSEMBLER__ */
 

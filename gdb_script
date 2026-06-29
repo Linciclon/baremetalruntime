@@ -5,4 +5,5 @@ set mem inaccessible-by-default off
 set $pc=0x10000000
 tui enable
 b main
+display/5i $pc
 c

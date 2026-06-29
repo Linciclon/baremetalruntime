@@ -40,6 +40,20 @@ SECTIONS {
         *(.rodata*)
     }
 
+    .ARM.exidx : {
+        *(.ARM.exidx*)
+    }
+
+    .eh_frame : {
+        *(.eh_frame*)
+    }
+
+#if defined(PLAT_NSC_BASE)
+    .nsc_gateway PLAT_NSC_BASE : {
+        KEEP(*(.nsc_gateway))
+    } > ROM
+#endif
+
 	. = ALIGN(32); /* start RW sections in separate page */
 	_data_lma_start = .;
 
