@@ -44,6 +44,12 @@ static uint32_t cycles_to_ns(uint32_t cycles)
     return (uint32_t)(((uint64_t)cycles * 1000000000ULL) / PLAT_DWT_FREQ);
 }
 
+#ifdef SECURE_INTERRUPT_LATENCY
+volatile uint32_t secure_systick_entry_cvr;
+volatile uint32_t secure_systick_latency_cycles;
+volatile uint32_t secure_systick_sample_count;
+#endif
+
 void uart_rx_handler()
 {
     uart_clear_rxirq();
@@ -52,7 +58,7 @@ void uart_rx_handler()
 
 void timer_handler()
 {
-    printf("VM0: SysTick Handler\n");
+    // printf("VM0: SysTick Handler\n");
     // int *ptr_addr = BAD_ADDR;
     // Tick_Counter++;
     // if(Tick_Counter == NUM_TICKS_FOR_BAD_ACCESS)
@@ -61,6 +67,16 @@ void timer_handler()
     //     /*Bad Memory Access here*/
     //     *ptr_addr = 0xdead; 
     // }
+    #ifdef SECURE_INTERRUPT_LATENCY
+        uint32_t latency_ns = (uint32_t)(((uint64_t)secure_systick_latency_cycles *
+                                          1000000000ULL) / TIMER_FREQ);
+
+        printf("Secure SysTick latency: %u cycles, %u ns (%u CVR, sample %u)\n",
+               secure_systick_latency_cycles,
+               latency_ns,
+               secure_systick_entry_cvr,
+               secure_systick_sample_count);
+    #endif
 }
 
 volatile uint32_t dbg_ipsr;
@@ -122,6 +138,7 @@ void main(void)
     printf("DWT S->NS switch: %u cycles, %u ns\n",
            dwt_s_to_ns_cycles, cycles_to_ns(dwt_s_to_ns_cycles));
 
+#ifdef CONTEXT_SWITCH_LAT
     dwt_ns_to_s_cycles = measure_ns_to_s_switch();
     printf("DWT NS->S gateway switch: %u cycles, %u ns\n",
            dwt_ns_to_s_cycles, cycles_to_ns(dwt_ns_to_s_cycles));
@@ -131,20 +148,29 @@ void main(void)
     dwt_ns_to_s_cycles = measure_ns_to_s_switch();
     printf("DWT NS->S gateway switch: %u cycles, %u ns\n",
            dwt_ns_to_s_cycles, cycles_to_ns(dwt_ns_to_s_cycles));
+#endif
 
     irq_set_handler(UART_IRQ_ID, uart_rx_handler);
-    // irq_set_handler(TIMER_IRQ_ID, timer_handler);
 
     uart_enable_rxirq();
 
     // Tick_Counter = 0; 
 
-    // timer_set(TIMER_INTERVAL);
-    // irq_enable(TIMER_IRQ_ID);
-    // irq_set_prio(TIMER_IRQ_ID, IRQ_MAX_PRIO);
+#ifdef SECURE_INTERRUPT_LATENCY
+    irq_set_handler(TIMER_IRQ_ID, timer_handler);
+    irq_enable(TIMER_IRQ_ID);
+    irq_set_prio(TIMER_IRQ_ID, IRQ_MAX_PRIO);
+    timer_set(TIMER_INTERVAL - 1);
+    systick->cvr = 0;
+#endif
 
     irq_enable(UART_IRQ_ID);
     irq_set_prio(UART_IRQ_ID, IRQ_MAX_PRIO);
+
+    #ifdef SECURE_INTERRUPT_LATENCY
+    //Jump to secure to measure non-secure interrupt latency 
+    measure_ns_to_s_switch();
+    #endif
 
     // debug_read_exception_state();
 

@@ -6,6 +6,12 @@ NAME:=baremetal
 ROOT_DIR:=$(realpath .)
 BUILD_DIR:=$(ROOT_DIR)/build/$(PLATFORM)
 
+# To evaluate Secure Interrupt Latency when execution is on
+SECURE_INTERRUPT_LATENCY:=y
+
+# To evaluate CONTEXT SWITCH time:
+#CONTEXT_SWITCH_LAT
+
 # Setup baremetal-runtime build
 include $(ROOT_DIR)/setup.mk
 

@@ -17,7 +17,7 @@
 
 #define STACK_SIZE          0x4000
 
-#define PLAT_TIMER_FREQ     15000000ULL
+#define PLAT_TIMER_FREQ     150000000ULL
 #define PLAT_DWT_FREQ       150000000ULL
                             
 #define PLAT_UART_ADDR      0x40089000UL
