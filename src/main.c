@@ -88,6 +88,11 @@ static void dwt_enable_cycle_counter(void)
     asm volatile("dsb\nisb" ::: "memory");
 }
 
+//function that is called from secure_dwt_ns_to_s_probe to stall secure world and force constant secure wolrd execution
+void stall_secure_world(){
+    while(1);
+}
+
 __attribute__((naked, section(".nsc_gateway"), aligned(32), used))
 uint32_t secure_dwt_ns_to_s_probe(void)
 {
@@ -95,6 +100,9 @@ uint32_t secure_dwt_ns_to_s_probe(void)
         "sg\n"
         "ldr r0, =0xE0001004\n"
         "ldr r0, [r0]\n"
+#ifdef NON_SECURE_WORLD_INT_LAT
+        "b stall_secure_world\n" //non-secure interrupt latency measurment 
+#endif
         "bxns lr\n");
 }
 
