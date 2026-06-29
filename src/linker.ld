@@ -58,6 +58,10 @@ SECTIONS {
     _data_lma_end = _data_lma_start + SIZEOF(.data);
 #endif
 
+    .latency (NOLOAD) :  {
+        KEEP(*(.latency))
+    }
+
     .bss (NOLOAD) :  {
         __bss_start = .;
         *(.bss* .sbss*)

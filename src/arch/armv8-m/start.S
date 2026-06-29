@@ -12,6 +12,12 @@
 .thumb_func
 .global _start
 _start:
+    // Capture DWT as soon as Non-secure execution starts.
+    ldr r0, =0xE0001004
+    ldr r0, [r0]
+    ldr r1, =dwt_s_to_ns_cycles
+    str r0, [r1]
+
     // Disable interrupts
     cpsid i
 

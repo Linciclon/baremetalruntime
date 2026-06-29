@@ -18,6 +18,7 @@
 #include <util.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <stdint.h>
 #include <cpu.h>
 #include <wfi.h>
 #include <spinlock.h>
@@ -32,6 +33,16 @@
 #define BAD_ADDR (int *) 0x20031000
 
 uint8_t Tick_Counter = 0;
+
+volatile uint32_t dwt_s_to_ns_cycles __attribute__((section(".latency"), used));
+volatile uint32_t dwt_ns_to_s_cycles;
+
+extern uint32_t measure_ns_to_s_switch(void);
+
+static uint32_t cycles_to_ns(uint32_t cycles)
+{
+    return (uint32_t)(((uint64_t)cycles * 1000000000ULL) / PLAT_DWT_FREQ);
+}
 
 void uart_rx_handler()
 {
@@ -51,8 +62,6 @@ void timer_handler()
     //     *ptr_addr = 0xdead; 
     // }
 }
-
-#include <stdint.h>
 
 volatile uint32_t dbg_ipsr;
 volatile uint32_t dbg_primask;
@@ -110,6 +119,18 @@ void debug_read_exception_state(void)
 void main(void)
 {
     printf("Initializing Non-secure Bare-metal APP! \n");
+    printf("DWT S->NS switch: %u cycles, %u ns\n",
+           dwt_s_to_ns_cycles, cycles_to_ns(dwt_s_to_ns_cycles));
+
+    dwt_ns_to_s_cycles = measure_ns_to_s_switch();
+    printf("DWT NS->S gateway switch: %u cycles, %u ns\n",
+           dwt_ns_to_s_cycles, cycles_to_ns(dwt_ns_to_s_cycles));
+    dwt_ns_to_s_cycles = measure_ns_to_s_switch();
+    printf("DWT NS->S gateway switch: %u cycles, %u ns\n",
+           dwt_ns_to_s_cycles, cycles_to_ns(dwt_ns_to_s_cycles));
+    dwt_ns_to_s_cycles = measure_ns_to_s_switch();
+    printf("DWT NS->S gateway switch: %u cycles, %u ns\n",
+           dwt_ns_to_s_cycles, cycles_to_ns(dwt_ns_to_s_cycles));
 
     irq_set_handler(UART_IRQ_ID, uart_rx_handler);
     // irq_set_handler(TIMER_IRQ_ID, timer_handler);
@@ -127,5 +148,5 @@ void main(void)
 
     // debug_read_exception_state();
 
-    while(1) wfi();
+    while(1);
 }
