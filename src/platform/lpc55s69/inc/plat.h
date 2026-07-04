@@ -9,14 +9,23 @@
 
 #define PLAT_NON_UNIFIED_MEM
 
+
+#ifdef RUN_INSIDE_VM
+#define PLAT_CODE_MEM_BASE  0x00020000
+#define PLAT_MEM_BASE       0x20010000
+#else
 #define PLAT_CODE_MEM_BASE  0x10000000
+#define PLAT_MEM_BASE       0x30000000
+#endif
+
 #define PLAT_CODE_MEM_SIZE  0x10000
 
+#ifndef RUN_INSIDE_VM
 #define PLAT_NSC_BASE       0x1000F000
 #define PLAT_NSC_SIZE       0x1000
 #define PLAT_NSC_DWT_PROBE_ADDR PLAT_NSC_BASE
+#endif
 
-#define PLAT_MEM_BASE       0x30000000
 #define PLAT_MEM_SIZE       0x8000
 
 #define PLAT_UART_ADDR      0x40088000UL
@@ -40,11 +49,11 @@
 // Non-secure code memory is located at 0x20000
 
 
-#define PLAT_NS_CODE_MEM_BASE  0x20000
-#define PLAT_NS_VECTOR_TABLE_BASE  0x23000
+#define PLAT_NS_CODE_MEM_BASE  0x30000
+#define PLAT_NS_VECTOR_TABLE_BASE  0x33000
 #define PLAT_NS_CODE_MEM_SIZE  0x10000
 
-#define PLAT_NS_MEM_BASE       0x20010000
+#define PLAT_NS_MEM_BASE       0x20020000
 #define PLAT_NS_MEM_SIZE       0x8000
 
 #define PLAT_NS_PERIPH_BASE    0x40000000UL

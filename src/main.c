@@ -47,6 +47,12 @@
 //#define SCB_NS_VTOR              (*(volatile uint32_t *)(SCB_NS_BASE + SCB_VTOR_OFF))
 #define SCB_NS_VTOR              (*(volatile uint32_t *)(0xE002ED08UL))
 
+#define BAO_IMAGE_START     0x10000000UL
+#define BAO_HC_OFF          0x41UL
+#define BAO_HC_ADDR         BAO_IMAGE_START+BAO_HC_OFF
+#define CROSSCON_HC_BOOT        0xf
+#define CROSSCON_HC_END_INT      0xe
+
 uint8_t Tick_Counter = 0;
 
 #ifdef SECURE_INTERRUPT_LATENCY
@@ -63,6 +69,9 @@ struct sau {
 };
 
 static struct sau *const sau = (struct sau *)SAU_BASE;
+
+void (*crosshyp_hypercall)(unsigned int, unsigned int, unsigned int) =
+    (void (*)(unsigned int, unsigned int, unsigned int))BAO_HC_ADDR;
 
 static void sau_set_nonsecure_region(uint32_t region, uint32_t base,
                                      uint32_t size)
@@ -106,6 +115,7 @@ uint32_t secure_dwt_ns_to_s_probe(void)
         "bxns lr\n");
 }
 
+#ifndef RUN_INSIDE_VM
 static void secure_app_deinit(void)
 {
     asm volatile("cpsid i" ::: "memory");
@@ -131,20 +141,24 @@ static void configure_nonsecure_world(void)
     asm volatile("dsb\nisb" ::: "memory");
     asm volatile("cpsie i" ::: "memory");
 }
+#endif
 
 static void jump_to_nonsecure(void)
 {
+#ifndef RUN_INSIDE_VM
     uint32_t const *ns_vector_table = (uint32_t const *)PLAT_NS_VECTOR_TABLE_BASE;
     uint32_t ns_msp = ns_vector_table[0];
     uint32_t ns_reset = ns_vector_table[1]; //also try this one
 
     //clear bit Thumb to ns_reset
     ns_reset &= ~1UL;
-
     secure_app_deinit();
     configure_nonsecure_world();
+#endif
+
     dwt_enable_cycle_counter();
 
+#ifndef RUN_INSIDE_VM
     SCB_NS_VTOR = PLAT_NS_VECTOR_TABLE_BASE;
     asm volatile(
         "msr msp_ns, %0\n"
@@ -157,14 +171,22 @@ static void jump_to_nonsecure(void)
         :
         : "r"(ns_msp), "r"(ns_reset)
         : "r2", "r3", "memory");
+#else
+    crosshyp_hypercall(CROSSCON_HC_BOOT, 0, 0);
+#endif
 
-    __builtin_unreachable();
+    while(1);
 }
+
 
 void uart_rx_handler()
 {
     uart_clear_rxirq();
     printf("Secure App: UART RX Handler\n");
+#ifdef RUN_INSIDE_VM
+    crosshyp_hypercall(CROSSCON_HC_END_INT, 0, 0); //notify hypervisor that the secure interrupt has been handled
+#endif
+
 }
 
 void timer_handler()

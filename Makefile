@@ -12,6 +12,9 @@ SECURE_INTERRUPT_LATENCY:=y
 # To evaluate Secure Interrupt 
 #NON_SECURE_WORLD_INT_LAT:=y
 
+# To run this inside a VM
+RUN_INSIDE_VM:=y
+
 # Setup baremetal-runtime build
 include $(ROOT_DIR)/setup.mk
 
