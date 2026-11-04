@@ -22,3 +22,11 @@ measure_ns_to_s_switch:
     bx r0
 
 .size measure_ns_to_s_switch, . - measure_ns_to_s_switch
+
+.thumb_func
+.align 2
+.global jump_to_secure
+.type jump_to_secure, %function
+jump_to_secure:
+    ldr r0, =(PLAT_NSC_DWT_PROBE_ADDR | 1)
+    bx r0
