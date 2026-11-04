@@ -19,6 +19,11 @@
 #define SYSCON_AHBCLKTRL1_FC5     (1 << 16)
 #define SYSCON_AHBCLKTRL1_FC6     (1 << 17)
 #define SYSCON_AHBCLKTRL1_FC7     (1 << 18)
+#define SYSCON_AHBCLKTRL1_CTIMER2 (1UL << 22)
+#define SYSCON_AHBCLKTRL1_CTIMER0 (1UL << 26)
+#define SYSCON_AHBCLKTRL1_CTIMER1 (1UL << 27)
+#define SYSCON_AHBCLKTRL2_CTIMER3 (1UL << 21)
+#define SYSCON_AHBCLKTRL2_CTIMER4 (1UL << 22)
 
 #define SYSCON_FCCLKSEL_MAINCLK  (0x0)
 #define SYSCON_FCCLKSEL_PLL0DIV  (0x1)
@@ -28,6 +33,15 @@
 #define SYSCON_FCCLKSEL_MCLK     (0x5)
 #define SYSCON_FCCLKSEL_OSC32K   (0x6)
 #define SYSCON_FCCLKSEL_NONE     (0x7)
+
+#define SYSCON_CTIMERCLKSEL_MAINCLK  SYSCON_FCCLKSEL_MAINCLK
+#define SYSCON_CTIMERCLKSEL_PLL0DIV  SYSCON_FCCLKSEL_PLL0DIV
+#define SYSCON_CTIMERCLKSEL_FRO12M   SYSCON_FCCLKSEL_FRO12M
+#define SYSCON_CTIMERCLKSEL_FROHFDIV SYSCON_FCCLKSEL_FROHFDIV
+#define SYSCON_CTIMERCLKSEL_FRO1M    SYSCON_FCCLKSEL_FRO1M
+#define SYSCON_CTIMERCLKSEL_MCLK     SYSCON_FCCLKSEL_MCLK
+#define SYSCON_CTIMERCLKSEL_OSC32K   SYSCON_FCCLKSEL_OSC32K
+#define SYSCON_CTIMERCLKSEL_NONE     SYSCON_FCCLKSEL_NONE
 
 #ifndef __ASSEMBLER__
 
@@ -82,22 +96,22 @@ struct syscon {
     union {
         struct {
             volatile uint32_t ctimerclksel0; // 0x26C
-            volatile uint32_t ctimerclksel1;
-            volatile uint32_t ctimerclksel2;
-            volatile uint32_t ctimerclksel3;
-            volatile uint32_t ctimerclksel4;
+            volatile uint32_t ctimerclksel1; // 0x270
+            volatile uint32_t ctimerclksel2; // 0x274
+            volatile uint32_t ctimerclksel3; // 0x278
+            volatile uint32_t ctimerclksel4; // 0x27C
         } ctimerclksel;
         volatile uint32_t ctimerclkselx[5];
     };
-    volatile uint32_t mainclksela;
-    volatile uint32_t mainclkselb;
-    volatile uint32_t clkoutsel;
-    uint32_t reserved_11;
-    volatile uint32_t pll0clksel;
-    volatile uint32_t pll1clksel;
-    uint32_t reserved_12[3];
-    volatile uint32_t adcclksel;
-    volatile uint32_t usb0clksel;
+    volatile uint32_t mainclksela; // 0x280
+    volatile uint32_t mainclkselb; // 0x284
+    volatile uint32_t clkoutsel;  // 0x288
+    uint32_t reserved_11;         //0x28C
+    volatile uint32_t pll0clksel; // 0x290
+    volatile uint32_t pll1clksel; // 0x294
+    uint32_t reserved_12[3];       // 0x298
+    volatile uint32_t adcclksel;   // 0x2A0
+    volatile uint32_t usb0clksel;  // 0x2A4
     uint32_t reserved_13;
     union {
         struct {
@@ -120,7 +134,7 @@ struct syscon {
     uint32_t reserved_16;
     volatile uint32_t sdioclksel;
     uint32_t reserved_17;
-    volatile uint32_t systickclkdiv0;
+    volatile uint32_t systickclkdiv0; // 0x2F0
     volatile uint32_t systickclkdiv1;
     volatile uint32_t traceclkdiv;
     uint32_t reserved_18[5];
@@ -140,7 +154,7 @@ struct syscon {
     uint32_t reserved_19[4];
     volatile uint32_t ahbclkdiv;
     volatile uint32_t clkoutdiv;
-    volatile uint32_t frohfdiv;
+    volatile uint32_t frohfdiv;  //0x2F8
     volatile uint32_t wdtclkdiv;
     uint32_t reserved_20;
     volatile uint32_t adcclkdiv;
@@ -344,6 +358,21 @@ static inline void syscon_rst_sign(rst_sign_t rsg_sign)
         syscon_s->presetctrlset[2] = (uint32_t)(1 << (rsg_sign & (~0xFF0000UL)));
         syscon_s->presetctrlclr[2] = (uint32_t)(1 << (rsg_sign & (~0xFF0000UL)));
     }
+}
+
+static inline void syscon_ctimer0_clk_enable(void)
+{
+    syscon_enable_clk(AHBCLKCTRL1, SYSCON_AHBCLKTRL1_CTIMER0);
+}
+
+static inline void syscon_ctimer0_clk_src(size_t clk)
+{
+    syscon_clk_src(CTIMERCLKSEL0, clk);
+}
+
+static inline void syscon_ctimer0_reset(void)
+{
+    syscon_rst_sign(CTIMER0_RST);
 }
 
 #endif

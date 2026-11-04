@@ -39,6 +39,19 @@ _exception_handler:
 
 define_handler _irq_handler
 _irq_handler:
+#ifdef USINGTIMER0
+#ifdef SECURE_INTERRUPT_LATENCY
+    // Capture Timer Counter as early as possible for interrupt latency.
+    ldr r1, =0x40008008
+    ldr r1, [r1]
+    ldr r2, =secure_systick_latency_cycles
+    str r1, [r2]
+    ldr r1, =secure_systick_sample_count
+    ldr r2, [r1]
+    adds r2, r2, #1
+    str r2, [r1]
+#endif
+#endif
     // Get the IRQ number
     mrs r0, IPSR
     // Call the IRQ handler
@@ -52,8 +65,15 @@ _systick_handler:
     // Capture Secure SysTick as early as possible for interrupt latency.
     ldr r1, =0xE000E018
     ldr r1, [r1]
+    ldr r3, =0xE0001004
+    ldr r3, [r3]
     ldr r2, =secure_systick_entry_cvr
+    ldr r4, =dwt_cycles_at_interrupt_entry
     str r1, [r2]
+    str r3, [r4]
+    // clear dwt counter
+    //movs r5, #0
+    //str  r5, [r3]
     ldr r2, =0xE000E014
     ldr r2, [r2]
     subs r1, r2, r1
