@@ -119,15 +119,30 @@ uint32_t secure_dwt_ns_to_s_probe(void)
         "bxns lr\n");
 }
 
+#define SECURE_IRQ_MASK \
+    ((1UL << 16) | (1UL << CTIMER0_PERIPH_IRQ_ID))
+
+
 #ifndef RUN_INSIDE_VM
 static void secure_app_deinit(void)
 {
     asm volatile("cpsid i" ::: "memory");
 
     for (uint32_t i = 0; i < 16; i++) {
-        nvic->icer[i] = 0xFFFeFFFFUL;
-        nvic->icpr[i] = 0xFFFeFFFFUL;
-        nvic->itns[i] = 0xFFFeFFFFUL;
+        uint32_t deinit_mask = 0xFFFEFFFFUL;
+
+#if defined(SECURE_INTERRUPT_LATENCY) && \
+    defined(EXECUTION_IN_NONSECURE_CONTEXT) && defined(USINGTIMER0)
+    #ifndef RUN_INSIDE_VM
+        if (i == (CTIMER0_PERIPH_IRQ_ID >> 5U)) {
+            deinit_mask &= ~SECURE_IRQ_MASK;
+        }
+    #endif
+#endif
+
+        nvic->icer[i] = deinit_mask;
+        nvic->icpr[i] = deinit_mask;
+        nvic->itns[i] = deinit_mask;
     }
 }
 
@@ -228,9 +243,11 @@ void timer_handler()
         dwt_latency_ns);
            
 #endif
-#ifdef RUN_INSIDE_VM
-    //crosshyp_hypercall(CROSSCON_HC_END_INT, 0, 0); //notify hypervisor that the secure interrupt has been handled
-#endif
+    #ifdef RUN_INSIDE_VM
+        #ifdef EXECUTION_IN_NONSECURE_CONTEXT
+            crosshyp_hypercall(CROSSCON_HC_END_INT, 0, 0); //notify hypervisor that the secure interrupt has been handled
+        #endif
+    #endif
 
 #endif
     
@@ -256,7 +273,7 @@ void main(void)
     irq_set_prio(TIMER_IRQ_ID, IRQ_MAX_PRIO);
 
 #ifdef USINGTIMER0
-    ctimer0_init_periodic_hz(PLAT_TIMER_FREQ, 1U, NULL, NULL);
+    ctimer0_init_periodic_hz(PLAT_TIMER_FREQ, 100U, NULL, NULL);
     ctimer0_clear_irq();
 #else
     //timer_set(TIMER_INTERVAL - 1);
@@ -285,5 +302,7 @@ void main(void)
     jump_to_nonsecure();
 #endif
 
+// This is the code that will run whenever non-secure make a call to secure
+// We need that execution stops in Secure for interrupts to be triggered in non-secure
     while(1) wfi();
 }

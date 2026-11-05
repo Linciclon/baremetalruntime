@@ -22,7 +22,7 @@ EXECUTION_IN_SECURE_CONTEXT:=y
 #RUN_INSIDE_VM:=y
 
 #To run with Timer0 instead of Systick timer for interrupt latency evaluation
-#USINGTIMER0:=y
+USINGTIMER0:=y
 
 # Setup baremetal-runtime build
 include $(ROOT_DIR)/setup.mk
