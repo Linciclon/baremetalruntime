@@ -5,6 +5,8 @@
 #include <iocon.h>
 #include <syscon.h>
 
+#define PLAT_LPC55S69 1
+
 #define PLAT_NON_UNIFIED_MEM
 
 #define PLAT_CODE_MEM_BASE  0x30000
@@ -17,8 +19,12 @@
 
 #define STACK_SIZE          0x4000
 
-#define PLAT_TIMER_FREQ     150000000ULL
-#define PLAT_DWT_FREQ       150000000ULL
+#ifdef USINGTIMER0
+#define PLAT_TIMER_FREQ     12000000ULL//96000000ULL//
+#else   
+#define PLAT_TIMER_FREQ     12500000ULL
+#endif
+#define PLAT_DWT_FREQ       12500000ULL
                             
 #define PLAT_UART_ADDR      0x40089000UL
 #define UART_IRQ_ID         17+EXT_INT_BASE

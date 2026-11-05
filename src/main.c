@@ -26,6 +26,7 @@
 #include <irq.h>
 #include <uart.h>
 #include <timer.h>
+#include "crosshyp.h"
 #ifdef USINGTIMER0
 #include <lpc_timer0.h>
 #endif
@@ -36,10 +37,19 @@
 #define DEMCR_TRCENA             (1UL << 24UL)
 #define DWT_CTRL_CYCCNTENA       (1UL << 0UL)
 
+#define PREFIX_MASK                           0xff000000
+#define PREFIX                                0
+#define CROSSCON_HC_END_INT                (PREFIX | 0xE)
+
 #define TIMER_INTERVAL (TIME_S(1))
 
 #define NUM_TICKS_FOR_BAD_ACCESS 20
 #define BAD_ADDR (int *) 0x20031000
+
+#ifdef PLAT_LPC55S69
+void (*crosshyp_hypercall)(unsigned int, unsigned int, unsigned int) =
+    (void (*)(unsigned int, unsigned int, unsigned int))CROSSHYP_HC_ADDR;
+#endif
 
 uint8_t Tick_Counter = 0;
 
@@ -96,18 +106,18 @@ uint32_t prev_cycle = 0;
 
 void timer_handler()
 {
-#ifdef USINGTIMER0
-    ctimer0_clear_irq();
-#endif
 #ifdef NONSECURE_INTERRUPT_LATENCY
+    #ifdef USINGTIMER0
+        ctimer0_clear_irq();
+    #endif
     uint32_t latency_ns = (uint32_t)(((uint64_t)nonsecure_systick_latency_cycles *
                                       1000000000ULL) / TIMER_FREQ);
-#ifdef USINGTIMER0
-    printf("Non-Secure TIMER0 latency: %u cycles, %u ns (sample %u)\n",
-           nonsecure_systick_latency_cycles,
-           latency_ns,
-           nonsecure_systick_sample_count);    
-#else
+    #ifdef USINGTIMER0
+        printf("Non-Secure TIMER0 latency: %u cycles, %u ns (sample %u)\n",
+               nonsecure_systick_latency_cycles,
+               latency_ns,
+               nonsecure_systick_sample_count);    
+    #else
 
     // printf("Non-Secure SysTick latency: %u cycles, %u dwt cycles, %u ns (%u CVR, sample %u)\n",
     //        nonsecure_systick_latency_cycles,
@@ -126,10 +136,13 @@ void timer_handler()
         nonsecure_dwt_cycles_at_interrupt_entry%1250000,
         dwt_latency_ns);
            
-#endif
-#ifdef RUN_INSIDE_VM
-    crosshyp_hypercall(CROSSCON_HC_END_INT, 0, 0); //notify hypervisor that the secure interrupt has been handled
-#endif
+    #endif
+
+    #ifdef RUN_INSIDE_VM
+        #ifdef EXECUTION_IN_SECURE_CONTEXT
+            crosshyp_hypercall(CROSSCON_HC_END_INT, 0, 0); //notify hypervisor that the secure interrupt has been handled
+        #endif
+    #endif
 #endif
     
 }
@@ -233,21 +246,21 @@ void main(void)
     irq_set_prio(TIMER_IRQ_ID, IRQ_MAX_PRIO);
 
     #ifdef USINGTIMER0
-    ctimer0_init_periodic_hz(PLAT_TIMER_FREQ, 1U, NULL, NULL);
-    ctimer0_clear_irq();
-#else
-    //timer_set(TIMER_INTERVAL - 1);
-    dwt_enable_cycle_counter();
-    DWT_CTRL |= DWT_CTRL_CYCCNTENA;
-    timer_set(1250000-1); //100ms FREQ * desired Time = number of ticks
+        ctimer0_init_periodic_hz(PLAT_TIMER_FREQ, 100U, NULL, NULL);
+        ctimer0_clear_irq();
+    #else
+        //timer_set(TIMER_INTERVAL - 1);
+        dwt_enable_cycle_counter();
+        DWT_CTRL |= DWT_CTRL_CYCCNTENA;
+        timer_set(1250000-1); //100ms FREQ * desired Time = number of ticks
     
     //systick->cvr = 0;
-#endif
+    #endif
 
-#ifdef USINGTIMER0
-    ctimer0_start();
-    asm volatile("cpsie i" ::: "memory");
-#endif
+    #ifdef USINGTIMER0
+        ctimer0_start();
+        asm volatile("cpsie i" ::: "memory");
+    #endif
 
 #endif
 
@@ -256,8 +269,13 @@ while(1);//acerescentei isto para validar as interrupções do timer
 #endif
 
 #ifdef EXECUTION_IN_SECURE_CONTEXT
+#ifndef RUN_INSIDE_VM
 //Jump to a secure context to measure secure interrupt latency
     jump_to_secure();
+#else
+    //Jump to a secure context to measure secure interrupt latency
+    crosshyp_hypercall(0, 0, 0); //invoke service from VM parent (0), hypercall id 0, no args
+#endif
 #endif
 
 

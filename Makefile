@@ -21,6 +21,12 @@ EXECUTION_IN_SECURE_CONTEXT:=y
 # To evaluate CONTEXT SWITCH time:
 #CONTEXT_SWITCH_LAT:=y
 
+# To run this inside a VM
+#RUN_INSIDE_VM:=y
+
+#To run with Timer0 instead of Systick timer for interrupt latency evaluation
+USINGTIMER0:=y
+
 # Setup baremetal-runtime build
 include $(ROOT_DIR)/setup.mk
 

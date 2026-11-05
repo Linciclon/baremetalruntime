@@ -39,6 +39,19 @@ _exception_handler:
 
 define_handler _irq_handler
 _irq_handler:
+#ifdef USINGTIMER0
+#ifdef NONSECURE_INTERRUPT_LATENCY
+    // Capture Timer Counter as early as possible for interrupt latency.
+    ldr r1, =0x40008008
+    ldr r1, [r1]
+    ldr r2, =nonsecure_systick_latency_cycles
+    str r1, [r2]
+    ldr r1, =nonsecure_systick_sample_count
+    ldr r2, [r1]
+    adds r2, r2, #1
+    str r2, [r1]
+#endif
+#endif
     // Get the IRQ number
     mrs r0, IPSR
     // Call the IRQ handler
