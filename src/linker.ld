@@ -54,13 +54,11 @@ SECTIONS {
     } > ROM
 #endif
 
-	. = ALIGN(32); /* start RW sections in separate page */
-	_data_lma_start = .;
-
 #if defined(PLAT_NON_UNIFIED_MEM)
+    . = ALIGN(32); /* start RW sections in separate page */
+    _data_lma_start = .;
     . = PLAT_MEM_BASE;
     _data_vma_start = .;
-#endif
 
     .data : AT(_data_lma_start){
         *(.data .data.*)
@@ -68,8 +66,13 @@ SECTIONS {
         *(.sdata .sdata.* .sdata2.*)
     }
 
-#if defined(PLAT_NON_UNIFIED_MEM)
     _data_lma_end = _data_lma_start + SIZEOF(.data);
+#else
+    .data : {
+        *(.data .data.*)
+        PROVIDE(__global_pointer$ = . + 0x800);
+        *(.sdata .sdata.* .sdata2.*)
+    }
 #endif
 
     .bss (NOLOAD) :  {
@@ -84,6 +87,8 @@ SECTIONS {
 #if defined(PLAT_NON_UNIFIED_MEM)
     . = . + STACK_SIZE;
     PROVIDE(_stack_top = .);
+#elif defined(PLAT_TOTAL_STACK_SIZE)
+    . = . + PLAT_TOTAL_STACK_SIZE;
 #else
     . = . + 2M; /* 2M of total stack size */
 #endif

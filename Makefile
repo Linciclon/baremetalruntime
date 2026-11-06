@@ -19,10 +19,14 @@ EXECUTION_IN_SECURE_CONTEXT:=y
 #EXECUTION_IN_NONSECURE_CONTEXT:=y
 
 # To run this inside a VM
-#RUN_INSIDE_VM:=y
+RUN_INSIDE_VM:=y
 
-#To run with Timer0 instead of Systick timer for interrupt latency evaluation
+# To run with Timer0 instead of Systick timer for interrupt latency evaluation.
+# Timer0 is an LPC55S69-specific peripheral; keep this option enabled for that
+# platform and silently ignore it for every other target.
+ifeq ($(PLATFORM),lpc55s69)
 USINGTIMER0:=y
+endif
 
 # Setup baremetal-runtime build
 include $(ROOT_DIR)/setup.mk

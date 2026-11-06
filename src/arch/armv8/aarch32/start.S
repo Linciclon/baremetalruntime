@@ -6,6 +6,8 @@
 
 #define GENERIC_TIMER_CNTCTL_CNTCR_EN   (0x1)
 #define GENERIC_TIMER_CNTCTL_CNTCR_OFFSET  (0x0)
+#define GENERIC_TIMER_CNTCTL_CNTCV_LO_OFFSET (0x8)
+#define GENERIC_TIMER_CNTCTL_CNTCV_HI_OFFSET (0xc)
 #define GENERIC_TIMER_CNTCTL_CNTDIF0_OFFSET  (0x20)
 
 .section .start, "ax"
@@ -19,6 +21,15 @@ _start:
     cps #MODE_SVC
     b entry_el1
 1:
+#ifdef PLAT_RZT2M
+    // Permit EL2 and EL1/0 accesses to the RZ/T2M low-latency peripheral port.
+    mrc p15, 0, r0, c15, c0, 0
+    orr r0, r0, #(1 << 1)
+    orr r0, r0, #1
+    dsb
+    mcr p15, 0, r0, c15, c0, 0
+    isb
+#endif
 #if GIC_VERSION == GICV3
     mrc p15, 4, r0, c12, c9, 5 // icc_hsre
     orr r0, r0, #0x9
@@ -27,6 +38,14 @@ _start:
 
 #if defined(MPU)
     ldr r0, =PLAT_GENERIC_TIMER_CNTCTL_BASE
+#ifdef PLAT_GENERIC_TIMER_FREQ
+    mov r1, #0
+    str r1, [r0, #GENERIC_TIMER_CNTCTL_CNTCR_OFFSET]
+    str r1, [r0, #GENERIC_TIMER_CNTCTL_CNTCV_LO_OFFSET]
+    str r1, [r0, #GENERIC_TIMER_CNTCTL_CNTCV_HI_OFFSET]
+    ldr r1, =PLAT_GENERIC_TIMER_FREQ
+    str r1, [r0, #GENERIC_TIMER_CNTCTL_CNTDIF0_OFFSET]
+#endif
     ldr r1, [r0, #GENERIC_TIMER_CNTCTL_CNTCR_OFFSET]
     orr r1, r1, #GENERIC_TIMER_CNTCTL_CNTCR_EN
     str r1, [r0, #GENERIC_TIMER_CNTCTL_CNTCR_OFFSET]
@@ -51,12 +70,14 @@ entry_el1:
     ldr r1, =_exception_vector
     mcr	p15, 0, r1, c12, c0, 0 // vbar
 
+#ifndef ARM_SOFT_FLOAT
     // Enable floating point
     mov r1, #(0xf << 20)
     mcr p15, 0, r1, c1, c0, 2 // cpacr
     isb
     mov r1, #(0x1 << 30)
     vmsr fpexc, r1
+#endif
 
     // TODO: invalidate caches, bp, etc...
 

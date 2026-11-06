@@ -23,9 +23,37 @@
 #include <spinlock.h>
 #include <plat.h>
 #include <irq.h>
-#include <systick.h>
 #include <uart.h>
 #include <timer.h>
+
+#ifdef PLAT_RZT2M
+
+static void rzt2m_uart_rx_handler(unsigned int id)
+{
+    (void)id;
+    uart_clear_rxirq();
+    printf("RZ/T2M: UART RX interrupt\n");
+}
+
+void main(void)
+{
+    printf("####################################\n");
+    printf("Native bare-metal running on RZ/T2M\n");
+    printf("####################################\n");
+
+    irq_set_handler(UART_IRQ_ID, rzt2m_uart_rx_handler);
+    irq_set_prio(UART_IRQ_ID, IRQ_MAX_PRIO);
+    irq_enable(UART_IRQ_ID);
+    uart_enable_rxirq();
+
+    while (1) {
+        wfi();
+    }
+}
+
+#else
+
+#include <systick.h>
 #ifdef USINGTIMER0
 #include <lpc_timer0.h>
 #endif
@@ -306,3 +334,5 @@ void main(void)
 // We need that execution stops in Secure for interrupts to be triggered in non-secure
     while(1) wfi();
 }
+
+#endif /* PLAT_RZT2M */
