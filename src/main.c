@@ -26,37 +26,96 @@
 #include <uart.h>
 #include <timer.h>
 
-#ifdef PLAT_RZT2M
-
-static void rzt2m_uart_rx_handler(unsigned int id)
-{
-    (void)id;
-    uart_clear_rxirq();
-    printf("RZ/T2M: UART RX interrupt\n");
-}
-
-void main(void)
-{
-    printf("####################################\n");
-    printf("Native bare-metal running on RZ/T2M\n");
-    printf("####################################\n");
-
-    irq_set_handler(UART_IRQ_ID, rzt2m_uart_rx_handler);
-    irq_set_prio(UART_IRQ_ID, IRQ_MAX_PRIO);
-    irq_enable(UART_IRQ_ID);
-    uart_enable_rxirq();
-
-    while (1) {
-        wfi();
-    }
-}
-
-#else
-
+#ifndef PLAT_RZT2M
 #include <systick.h>
-#ifdef USINGTIMER0
+#ifdef USINGTIMER
 #include <lpc_timer0.h>
 #endif
+#endif
+
+#ifdef SECURE_INTERRUPT_LATENCY
+volatile uint32_t secure_systick_entry_cvr;
+volatile uint32_t secure_systick_latency_cycles;
+volatile uint32_t secure_systick_sample_count;
+volatile uint32_t dwt_cycles_at_interrupt_entry;
+#endif
+
+#if defined(SECURE_INTERRUPT_LATENCY) && defined(USINGTIMER)
+#define N_WARMUP_SAMPLES 100U
+#define N_SAMPLES        1000U
+
+spinlock_t print_lock = SPINLOCK_INITVAL;
+unsigned long samples[N_SAMPLES];
+
+static void collect_timer_latency_sample(void)
+{
+    static unsigned long warmup_cnt = N_WARMUP_SAMPLES;
+    static unsigned long sample_cnt;
+
+    if (warmup_cnt != 0U) {
+        warmup_cnt--;
+        #ifdef SECURE_INTERRUPT_LATENCY
+            #ifdef RUN_INSIDE_VM
+                #ifdef EXECUTION_IN_NONSECURE_CONTEXT
+                    crosshyp_hypercall(CROSSCON_HC_END_INT, 0, 0); //notify hypervisor that the secure interrupt has been handled
+                #endif
+            #endif
+        #endif
+        return;
+    }
+
+    if (sample_cnt >= N_SAMPLES) {
+        #ifdef SECURE_INTERRUPT_LATENCY
+            #ifdef RUN_INSIDE_VM
+                #ifdef EXECUTION_IN_NONSECURE_CONTEXT
+                    crosshyp_hypercall(CROSSCON_HC_END_INT, 0, 0); //notify hypervisor that the secure interrupt has been handled
+                #endif
+            #endif
+        #endif
+        return;
+    }
+
+    samples[sample_cnt++] = (unsigned long)secure_systick_latency_cycles;
+
+    if (sample_cnt == N_SAMPLES) {
+        /* Stop first: printing must not perturb any sample in this batch. */
+        timer_disable();
+
+        spin_lock(&print_lock);
+        for (size_t i = 0U; i < N_SAMPLES; i++) {
+#ifdef PLAT_RZT2M
+#ifdef RUN_INSIDE_VM
+            printf("%u,ARMv8-R,MTU%d,active_vm,%lu\n",
+                   (unsigned int)(i + 1U), MTU_CHANNEL, samples[i]);
+#else
+            printf("%u,ARMv8-R,MTU%d,native,%lu\n",
+                   (unsigned int)(i + 1U), MTU_CHANNEL, samples[i]);
+#endif
+#else
+#ifdef RUN_INSIDE_VM
+            printf("%u,ARMv8-M,CTIMER0,active_vm,%lu\n",
+                   (unsigned int)(i + 1U), samples[i]);
+#else
+            printf("%u,ARMv8-M,CTIMER0,native,%lu\n",
+                   (unsigned int)(i + 1U), samples[i]);
+#endif
+#endif
+        }
+        spin_unlock(&print_lock);
+    }
+}
+#endif
+
+#define BAO_IMAGE_START          0x10000000UL
+#define BAO_HC_OFF               0x41UL
+#define BAO_HC_ADDR              (BAO_IMAGE_START + BAO_HC_OFF)
+#define CROSSCON_HC_BOOT         0xf
+#define CROSSCON_HC_END_INT      0xe
+
+void (*crosshyp_hypercall)(unsigned int, unsigned int, unsigned int) =
+    (void (*)(unsigned int, unsigned int, unsigned int))BAO_HC_ADDR;
+
+#ifndef PLAT_RZT2M
 
 #define TIMER_INTERVAL (TIME_US(10))
 //#define TIMER_INTERVAL (142857142)
@@ -79,20 +138,7 @@ void main(void)
 //#define SCB_NS_VTOR              (*(volatile uint32_t *)(SCB_NS_BASE + SCB_VTOR_OFF))
 #define SCB_NS_VTOR              (*(volatile uint32_t *)(0xE002ED08UL))
 
-#define BAO_IMAGE_START     0x10000000UL
-#define BAO_HC_OFF          0x41UL
-#define BAO_HC_ADDR         BAO_IMAGE_START+BAO_HC_OFF
-#define CROSSCON_HC_BOOT        0xf
-#define CROSSCON_HC_END_INT      0xe
-
 uint8_t Tick_Counter = 0;
-
-#ifdef SECURE_INTERRUPT_LATENCY
-volatile uint32_t secure_systick_entry_cvr;
-volatile uint32_t secure_systick_latency_cycles;
-volatile uint32_t secure_systick_sample_count;
-volatile uint32_t dwt_cycles_at_interrupt_entry;
-#endif
 struct sau {
     volatile uint32_t ctrl;
     volatile const uint32_t type;
@@ -102,9 +148,6 @@ struct sau {
 };
 
 static struct sau *const sau = (struct sau *)SAU_BASE;
-
-void (*crosshyp_hypercall)(unsigned int, unsigned int, unsigned int) =
-    (void (*)(unsigned int, unsigned int, unsigned int))BAO_HC_ADDR;
 
 static void sau_set_nonsecure_region(uint32_t region, uint32_t base,
                                      uint32_t size)
@@ -160,7 +203,7 @@ static void secure_app_deinit(void)
         uint32_t deinit_mask = 0xFFFEFFFFUL;
 
 #if defined(SECURE_INTERRUPT_LATENCY) && \
-    defined(EXECUTION_IN_NONSECURE_CONTEXT) && defined(USINGTIMER0)
+    defined(EXECUTION_IN_NONSECURE_CONTEXT) && defined(USINGTIMER)
     #ifndef RUN_INSIDE_VM
         if (i == (CTIMER0_PERIPH_IRQ_ID >> 5U)) {
             deinit_mask &= ~SECURE_IRQ_MASK;
@@ -225,9 +268,27 @@ static void jump_to_nonsecure(void)
     while(1);
 }
 
+#else
 
-void uart_rx_handler()
+/* RZ/T2M has no Cortex-M SAU/non-secure vector-table transition.  In the VM,
+ * retain the existing hypercall path; a native non-secure payload needs a
+ * platform-specific world-switch implementation. */
+static void jump_to_nonsecure(void)
 {
+#ifdef RUN_INSIDE_VM
+    crosshyp_hypercall(CROSSCON_HC_BOOT, 0, 0);
+#endif
+    while (1) {
+        wfi();
+    }
+}
+
+#endif /* PLAT_RZT2M */
+
+
+void uart_rx_handler(unsigned int id)
+{
+    (void)id;
     uart_clear_rxirq();
     printf("Secure App: UART RX Handler\n");
 #ifdef RUN_INSIDE_VM
@@ -238,20 +299,18 @@ void uart_rx_handler()
 
 uint32_t prev_cycle = 0;
 
-void timer_handler()
+void timer_handler(unsigned int id)
 {
-#ifdef USINGTIMER0
-    ctimer0_clear_irq();
+    (void)id;
+#ifdef USINGTIMER
+    clear_timer_interrupt();
 #endif
 #ifdef SECURE_INTERRUPT_LATENCY
+#ifdef USINGTIMER
+    collect_timer_latency_sample();
+#else
     uint32_t latency_ns = (uint32_t)(((uint64_t)secure_systick_latency_cycles *
                                       1000000000ULL) / TIMER_FREQ);
-#ifdef USINGTIMER0
-    printf("Secure TIMER0 latency: %u cycles, %u ns (sample %u)\n",
-           secure_systick_latency_cycles,
-           latency_ns,
-           secure_systick_sample_count);    
-#else
 
     // printf("Secure SysTick latency: %u cycles, %u dwt cycles, %u ns (%u CVR, sample %u)\n",
     //        secure_systick_latency_cycles,
@@ -288,21 +347,18 @@ void main(void)
     printf("#############################\n");
 
     irq_set_handler(UART_IRQ_ID, uart_rx_handler);
-
-    uart_enable_rxirq();
-
-    irq_enable(UART_IRQ_ID);
     irq_set_prio(UART_IRQ_ID, IRQ_MAX_PRIO);
-
+    irq_enable(UART_IRQ_ID);
+    uart_enable_rxirq();
 
 #ifdef SECURE_INTERRUPT_LATENCY
     irq_set_handler(TIMER_IRQ_ID, timer_handler);
-    irq_enable(TIMER_IRQ_ID);
     irq_set_prio(TIMER_IRQ_ID, IRQ_MAX_PRIO);
+    irq_enable(TIMER_IRQ_ID);
 
-#ifdef USINGTIMER0
-    ctimer0_init_periodic_hz(PLAT_TIMER_FREQ, 100U, NULL, NULL);
-    ctimer0_clear_irq();
+#ifdef USINGTIMER
+    timer_init(PLAT_TIMER_FREQ, 100000U); //100Hz
+    clear_timer_interrupt();
 #else
     //timer_set(TIMER_INTERVAL - 1);
     dwt_enable_cycle_counter();
@@ -312,8 +368,8 @@ void main(void)
     //systick->cvr = 0;
 #endif
 
-#ifdef USINGTIMER0
-    ctimer0_start();
+#ifdef USINGTIMER
+    timer_enable();
     asm volatile("cpsie i" ::: "memory");
 #endif
 #endif
@@ -334,5 +390,3 @@ void main(void)
 // We need that execution stops in Secure for interrupts to be triggered in non-secure
     while(1) wfi();
 }
-
-#endif /* PLAT_RZT2M */

@@ -23,6 +23,26 @@
 #define PLAT_GENERIC_TIMER_CNTCTL_BASE  0xC0060000
 #define PLAT_GENERIC_TIMER_FREQ         25000000
 
+/* The MTU block is clocked by PCLKH.  Use the same overflow sources as the
+ * known-good bare-metal application: TCIV4 or TCIV7. */
+#define PLAT_TIMER_FREQ                 200000000U
+
+#ifndef MTU_CHANNEL
+#define MTU_CHANNEL                     4
+#endif
+
+#if MTU_CHANNEL == 4
+#define RZT2M_TIMER_EVENT_ID            93U
+#define RZT2M_TIMER_COUNTER_ADDR         0x90001212U
+#elif MTU_CHANNEL == 7
+#define RZT2M_TIMER_EVENT_ID            106U
+#define RZT2M_TIMER_COUNTER_ADDR         0x90001A12U
+#else
+#error "Unsupported MTU_CHANNEL; supported channels are 4 and 7"
+#endif
+
+#define RZT2M_TIMER_IRQ_ID              (RZT2M_TIMER_EVENT_ID + 32U)
+
 #define PLAT_GICD_BASE_ADDR 0x94000000
 #define PLAT_GICR_BASE_ADDR 0x94100000
 

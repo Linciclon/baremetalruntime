@@ -133,3 +133,8 @@ void clear_timer_interrupt(void)
 {
     ctimer0_clear_irq();
 }
+
+void timer_init(uint32_t timer_clk_hz, uint32_t period_hz)
+{
+    ctimer0_periodic_init(timer_clk_hz, period_hz);
+}

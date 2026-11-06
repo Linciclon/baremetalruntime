@@ -7,10 +7,10 @@ ROOT_DIR:=$(realpath .)
 BUILD_DIR:=$(ROOT_DIR)/build/$(PLATFORM)
 
 # To evaluate Secure Interrupt Latency 
-#SECURE_INTERRUPT_LATENCY:=y
+SECURE_INTERRUPT_LATENCY:=y
 
 # To evaluate Non-Secure Interrupt Latency
-NONSECURE_INTERRUPT_LATENCY:=y
+#NONSECURE_INTERRUPT_LATENCY:=y
 
 # To evaluate Interrupt Latency in Secure Context
 EXECUTION_IN_SECURE_CONTEXT:=y
@@ -21,11 +21,10 @@ EXECUTION_IN_SECURE_CONTEXT:=y
 # To run this inside a VM
 RUN_INSIDE_VM:=y
 
-# To run with Timer0 instead of Systick timer for interrupt latency evaluation.
-# Timer0 is an LPC55S69-specific peripheral; keep this option enabled for that
-# platform and silently ignore it for every other target.
-ifeq ($(PLATFORM),lpc55s69)
-USINGTIMER0:=y
+# Use the platform timer instead of SysTick/the architectural timer.  This
+# selects CTIMER0 on LPC55S69 and MTU channel 4/7 on RZ/T2M.
+ifneq ($(filter $(PLATFORM),lpc55s69 rzt2m),)
+USINGTIMER:=y
 endif
 
 # Setup baremetal-runtime build

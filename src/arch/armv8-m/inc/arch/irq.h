@@ -9,7 +9,7 @@
 #include <plat.h>
 
 #define IPI_IRQ_ID      (0)
-#ifdef USINGTIMER0
+#ifdef USINGTIMER
 #define TIMER_IRQ_ID    (CTIMER0_IRQ_ID)//use ctimer0 timer
 #else
 #define TIMER_IRQ_ID    (15)            //use systick timer

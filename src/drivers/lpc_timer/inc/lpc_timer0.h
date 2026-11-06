@@ -86,6 +86,7 @@ void ctimer0_irq_handler(void);
 void ctimer0_periodic_init(uint32_t timer_clk_hz, uint32_t period_hz);
 void start_timer(uint32_t timer_clk_hz, uint32_t period_hz);
 void clear_timer_interrupt(void);
+void timer_init(uint32_t timer_clk_hz, uint32_t period_hz);
 
 #endif
 

@@ -91,6 +91,9 @@ typedef enum e_bsp_reg_protect
     BSP_REG_PROTECT_SYSTEM,
 } bsp_reg_protect_t;
 
+void register_protect_disable(bsp_reg_protect_t regs_to_unprotect);
+void register_protect_enable(bsp_reg_protect_t regs_to_protect);
+
 /** UART Parity definition */
 typedef enum e_uart_parity
 {
