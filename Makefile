@@ -13,10 +13,10 @@ SECURE_INTERRUPT_LATENCY:=y
 #NONSECURE_INTERRUPT_LATENCY:=y
 
 # To evaluate Interrupt Latency in Secure Context
-EXECUTION_IN_SECURE_CONTEXT:=y
+#EXECUTION_IN_SECURE_CONTEXT:=y
 
 # To evaluate Interrupt Latency in Non-Secure Context
-#EXECUTION_IN_NONSECURE_CONTEXT:=y
+EXECUTION_IN_NONSECURE_CONTEXT:=y
 
 # To run this inside a VM
 RUN_INSIDE_VM:=y

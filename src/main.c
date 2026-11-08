@@ -25,6 +25,13 @@
 #include <irq.h>
 #include <uart.h>
 #include <timer.h>
+#include "crosshyp.h"
+
+//#define BAO_IMAGE_START          0x10000000UL
+//#define BAO_HC_OFF               0x41UL
+//#define BAO_HC_ADDR              (BAO_IMAGE_START + BAO_HC_OFF)
+//#define CROSSCON_HC_BOOT         0xf
+#define CROSSCON_HC_END_INT      0xe
 
 #ifndef PLAT_RZT2M
 #include <systick.h>
@@ -41,8 +48,8 @@ volatile uint32_t dwt_cycles_at_interrupt_entry;
 #endif
 
 #if defined(SECURE_INTERRUPT_LATENCY) && defined(USINGTIMER)
-#define N_WARMUP_SAMPLES 100U
-#define N_SAMPLES        1000U
+#define N_WARMUP_SAMPLES 500U
+#define N_SAMPLES        100U
 
 spinlock_t print_lock = SPINLOCK_INITVAL;
 unsigned long samples[N_SAMPLES];
@@ -54,7 +61,7 @@ static void collect_timer_latency_sample(void)
 
     if (warmup_cnt != 0U) {
         warmup_cnt--;
-        #ifdef SECURE_INTERRUPT_LATENCY
+        #ifdef PLAT_LPC55S69
             #ifdef RUN_INSIDE_VM
                 #ifdef EXECUTION_IN_NONSECURE_CONTEXT
                     crosshyp_hypercall(CROSSCON_HC_END_INT, 0, 0); //notify hypervisor that the secure interrupt has been handled
@@ -65,7 +72,7 @@ static void collect_timer_latency_sample(void)
     }
 
     if (sample_cnt >= N_SAMPLES) {
-        #ifdef SECURE_INTERRUPT_LATENCY
+        #ifdef PLAT_LPC55S69
             #ifdef RUN_INSIDE_VM
                 #ifdef EXECUTION_IN_NONSECURE_CONTEXT
                     crosshyp_hypercall(CROSSCON_HC_END_INT, 0, 0); //notify hypervisor that the secure interrupt has been handled
@@ -106,14 +113,8 @@ static void collect_timer_latency_sample(void)
 }
 #endif
 
-#define BAO_IMAGE_START          0x10000000UL
-#define BAO_HC_OFF               0x41UL
-#define BAO_HC_ADDR              (BAO_IMAGE_START + BAO_HC_OFF)
-#define CROSSCON_HC_BOOT         0xf
-#define CROSSCON_HC_END_INT      0xe
-
-void (*crosshyp_hypercall)(unsigned int, unsigned int, unsigned int) =
-    (void (*)(unsigned int, unsigned int, unsigned int))BAO_HC_ADDR;
+// void (*crosshyp_hypercall)(unsigned int, unsigned int, unsigned int) =
+//     (void (*)(unsigned int, unsigned int, unsigned int))BAO_HC_ADDR;
 
 #ifndef PLAT_RZT2M
 
@@ -279,7 +280,7 @@ static void jump_to_nonsecure(void)
     crosshyp_hypercall(CROSSCON_HC_BOOT, 0, 0);
 #endif
     while (1) {
-        wfi();
+        crosshyp_hypercall(CROSSCON_HC_END_INT, 0, 0); //notify hypervisor that the secure interrupt has been handled
     }
 }
 
@@ -291,8 +292,10 @@ void uart_rx_handler(unsigned int id)
     (void)id;
     uart_clear_rxirq();
     printf("Secure App: UART RX Handler\n");
+#ifdef PLAT_LPC55S69 
 #ifdef RUN_INSIDE_VM
     crosshyp_hypercall(CROSSCON_HC_END_INT, 0, 0); //notify hypervisor that the secure interrupt has been handled
+#endif
 #endif
 
 }
@@ -330,11 +333,14 @@ void timer_handler(unsigned int id)
         dwt_latency_ns);
            
 #endif
+#ifdef PLAT_LPC55S69 
+    //it need to sinalise end of interrupt in armv8-m
     #ifdef RUN_INSIDE_VM
-        #ifdef EXECUTION_IN_NONSECURE_CONTEXT
+        #ifdef EXECUTION_IN_SECURE_CONTEXT
             crosshyp_hypercall(CROSSCON_HC_END_INT, 0, 0); //notify hypervisor that the secure interrupt has been handled
         #endif
     #endif
+#endif
 
 #endif
     
@@ -357,7 +363,7 @@ void main(void)
     irq_enable(TIMER_IRQ_ID);
 
 #ifdef USINGTIMER
-    timer_init(PLAT_TIMER_FREQ, 100000U); //100Hz
+    timer_init(PLAT_TIMER_FREQ, 10000U); //100Hz
     clear_timer_interrupt();
 #else
     //timer_set(TIMER_INTERVAL - 1);

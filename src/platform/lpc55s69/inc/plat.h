@@ -7,6 +7,8 @@
 
 //Secure memory and peripheral regions
 
+#define PLAT_LPC55S69 1
+
 #define PLAT_NON_UNIFIED_MEM
 
 

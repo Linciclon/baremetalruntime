@@ -44,8 +44,7 @@ static void rzt2m_gicd_icfgr_init(void)
 
 /* Keep the MMIO pointer observable in debug builds while preserving volatile
  * accesses to the peripheral registers. */
-static volatile R_SCI0_Type * volatile uart __attribute__((used)) =
-    (volatile R_SCI0_Type *)RZT2M_UART_BASE;
+static volatile R_SCI0_Type * volatile uart __attribute__((used)) = (volatile R_SCI0_Type *)RZT2M_UART_BASE;
 
 void uart_init(void)
 {
