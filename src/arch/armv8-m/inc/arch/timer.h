@@ -9,7 +9,7 @@
 #include <core.h>
 #include <sysregs.h>
 
-#ifdef USINGTIMER0
+#ifdef USINGTIMER
 #include <lpc_timer0.h>
 #else
 #include <systick.h>
@@ -19,7 +19,7 @@
 
 static inline void timer_enable(void)
 {
-#ifdef USINGTIMER0
+#ifdef USINGTIMER
     ctimer0_start();
 #else
     systick_set_csr( systick_get_csr() | SYSTICK_CSR_ENABLE | SYSTICK_CSR_CLKSOURCE);
@@ -28,7 +28,7 @@ static inline void timer_enable(void)
 
 static inline void timer_disable(void)
 {
-#ifdef USINGTIMER0
+#ifdef USINGTIMER
     ctimer0_stop();
 #else
     systick_set_csr(systick_get_csr() & ~SYSTICK_CSR_ENABLE);
@@ -37,7 +37,7 @@ static inline void timer_disable(void)
 
 static inline void timer_set(uint64_t value)
 {
-#ifdef USINGTIMER0
+#ifdef USINGTIMER
     uint32_t ticks = value >= UINT32_MAX ? UINT32_MAX : (uint32_t)value + 1U;
     ctimer0_set_match_ticks(ticks);
 #else
@@ -49,7 +49,7 @@ static inline void timer_set(uint64_t value)
 
 static inline uint64_t timer_get(void)
 {
-#ifdef USINGTIMER0
+#ifdef USINGTIMER
     return (uint64_t)ctimer0_get();
 #else
     return (uint64_t)systick_get_cvr();

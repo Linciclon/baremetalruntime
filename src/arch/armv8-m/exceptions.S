@@ -39,7 +39,7 @@ _exception_handler:
 
 define_handler _irq_handler
 _irq_handler:
-#ifdef USINGTIMER0
+#ifdef USINGTIMER
 #ifdef NONSECURE_INTERRUPT_LATENCY
     // Capture Timer Counter as early as possible for interrupt latency.
     ldr r1, =0x40008008

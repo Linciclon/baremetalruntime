@@ -19,7 +19,7 @@
 
 #define STACK_SIZE          0x4000
 
-#ifdef USINGTIMER0
+#ifdef USINGTIMER
 #define PLAT_TIMER_FREQ     12000000ULL//96000000ULL//
 #else   
 #define PLAT_TIMER_FREQ     12500000ULL

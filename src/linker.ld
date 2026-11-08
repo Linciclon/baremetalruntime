@@ -48,7 +48,14 @@ SECTIONS {
     _data_vma_start = .;
 #endif
 
-    .data : AT(_data_lma_start){
+#if defined(PLAT_NON_UNIFIED_MEM)
+    .data : AT(_data_lma_start) {
+#else
+    /* In a unified address space, initialized data executes where it is
+     * loaded.  Giving it an explicit LMA can displace the binary contents
+     * when the linker inserts orphan sections (for example .eh_frame). */
+    .data : {
+#endif
         *(.data .data.*)
         PROVIDE(__global_pointer$ = . + 0x800);
         *(.sdata .sdata.* .sdata2.*)
@@ -74,6 +81,8 @@ SECTIONS {
 #if defined(PLAT_NON_UNIFIED_MEM)
     . = . + STACK_SIZE;
     PROVIDE(_stack_top = .);
+#elif defined(PLAT_TOTAL_STACK_SIZE)
+    . = . + PLAT_TOTAL_STACK_SIZE;
 #else
     . = . + 2M; /* 2M of total stack size */
 #endif

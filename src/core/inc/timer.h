@@ -11,6 +11,11 @@
 uint64_t timer_get();
 void timer_set(uint64_t n);
 
+#ifdef USINGTIMER
+void timer_init(uint32_t timer_clk_hz, uint32_t period_hz);
+void clear_timer_interrupt(void);
+#endif
+
 static inline void timer_wait(uint64_t n) {
     uint64_t start = timer_get();
     while(timer_get() < (start+n));
