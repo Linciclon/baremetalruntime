@@ -12,6 +12,11 @@
 #include <cpu.h>
 #include <fences.h>
 #include <wfi.h>
+#include <plat.h>
+
+#if defined(CONTEXT_SWITCH_LATENCY) && defined(PLAT_LPC55S69)
+extern volatile uint32_t dwt_s_to_ns_cycles;
+#endif
 
 int _read(int file, char *ptr, int len)
 {
@@ -103,6 +108,17 @@ void _init(){
     if(!init_done) {
         init_done = true;
         uart_init();
+#if defined(CONTEXT_SWITCH_LATENCY) && defined(PLAT_LPC55S69)
+        /* _start captured/stopped CYCCNT before any runtime initialization. */
+#ifdef RUN_INSIDE_VM
+        printf("DWT initial VM S->NS switch: %u cycles, %u ns\n",
+#else
+        printf("DWT initial S->NS switch: %u cycles, %u ns\n",
+#endif
+               dwt_s_to_ns_cycles,
+               (uint32_t)(((uint64_t)dwt_s_to_ns_cycles * 1000000000ULL) /
+                          PLAT_DWT_FREQ));
+#endif
     }
     spin_unlock(&init_lock);
     

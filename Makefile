@@ -7,7 +7,7 @@ ROOT_DIR:=$(realpath .)
 BUILD_DIR:=$(ROOT_DIR)/build/$(PLATFORM)
 
 # To evaluate Secure Interrupt Latency 
-SECURE_INTERRUPT_LATENCY:=y
+#SECURE_INTERRUPT_LATENCY:=y
 
 # To evaluate Non-Secure Interrupt Latency
 #NONSECURE_INTERRUPT_LATENCY:=y
@@ -16,7 +16,7 @@ SECURE_INTERRUPT_LATENCY:=y
 #EXECUTION_IN_SECURE_CONTEXT:=y
 
 # To evaluate Interrupt Latency in Non-Secure Context
-EXECUTION_IN_NONSECURE_CONTEXT:=y
+#EXECUTION_IN_NONSECURE_CONTEXT:=y
 
 # To evaluate CONTEXT SWITCH time:
 #CONTEXT_SWITCH_LAT:=y
@@ -24,8 +24,11 @@ EXECUTION_IN_NONSECURE_CONTEXT:=y
 # To run this inside a VM
 RUN_INSIDE_VM:=y
 
+# To evaluate context switch latency
+CONTEXT_SWITCH_LATENCY:=y
 
-USINGTIMER:=y
+# The context-switch experiment uses the shared DWT, not CTIMER0.
+#USINGTIMER:=y
 
 # Setup baremetal-runtime build
 include $(ROOT_DIR)/setup.mk

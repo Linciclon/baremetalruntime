@@ -85,9 +85,6 @@ void lpc_uart_putc(volatile fc_uart_t* uart, int8_t c)
     while (0U == (uart->fifostat & FCUART_FIFOSTAT_TXNOTFULL)) { }
 
     uart->fifowr = (uint32_t)c;
-
-    while (0U == (uart->stat & FCUART_STAT_TXIDLE)) { }
-    return;
 }
 
 char lpc_uart_getc(volatile fc_uart_t* uart)

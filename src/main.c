@@ -60,6 +60,46 @@ extern uint32_t measure_ns_to_s_switch(void);
 
 extern uint32_t jump_to_secure(void);
 
+#if defined(CONTEXT_SWITCH_LATENCY) && defined(RUN_INSIDE_VM)
+extern uint32_t measure_vm_context_switch(uint32_t hypercall_id);
+
+#define VM_CONTEXT_SAMPLE_ADDR 0x20000000UL
+static volatile uint32_t const *const vm_ca_to_ta1_cycles =
+    (volatile uint32_t const *)VM_CONTEXT_SAMPLE_ADDR;
+static volatile uint32_t const *const vm_ca_to_ta2_cycles =
+    (volatile uint32_t const *)(VM_CONTEXT_SAMPLE_ADDR + sizeof(uint32_t));
+
+/* Avoid printf/newlib after a VM resume.  The hypervisor's Armv8-M return
+ * path currently faults while executing the deeper printf call chain. */
+static void vm_uart_puts(char const *s)
+{
+    while (*s != '\0') {
+        if (*s == '\n') {
+            uart_putc('\r');
+        }
+        uart_putc(*s++);
+    }
+}
+
+static void vm_uart_puthex32(uint32_t value)
+{
+    static char const digits[] = "0123456789abcdef";
+
+    for (int shift = 28; shift >= 0; shift -= 4) {
+        uart_putc(digits[(value >> (uint32_t)shift) & 0xfU]);
+    }
+}
+
+static void vm_print_sample(char const *direction, uint32_t cycles)
+{
+    vm_uart_puts("DWT VM ");
+    vm_uart_puts(direction);
+    vm_uart_puts(" switch: 0x");
+    vm_uart_puthex32(cycles);
+    vm_uart_puts(" cycles\n");
+}
+#endif
+
 #ifndef PLAT_RZT2M
 static uint32_t cycles_to_ns(uint32_t cycles)
 {
@@ -272,28 +312,38 @@ void main(void)
     printf("This is the Non-secure Baremetal! \n");
     printf("#############################\n");
 
-#ifndef PLAT_RZT2M
-    printf("DWT S->NS switch: %u cycles, %u ns\n",
-           dwt_s_to_ns_cycles, cycles_to_ns(dwt_s_to_ns_cycles));
-#endif
 
+#ifndef CONTEXT_SWITCH_LATENCY
     irq_set_handler(UART_IRQ_ID, uart_rx_handler);
-
     uart_enable_rxirq();
-
     irq_enable(UART_IRQ_ID);
     irq_set_prio(UART_IRQ_ID, IRQ_MAX_PRIO);
+#endif
 
-#ifdef CONTEXT_SWITCH_LAT
-    dwt_ns_to_s_cycles = measure_ns_to_s_switch();
-    printf("DWT NS->S gateway switch: %u cycles, %u ns\n",
-           dwt_ns_to_s_cycles, cycles_to_ns(dwt_ns_to_s_cycles));
-    dwt_ns_to_s_cycles = measure_ns_to_s_switch();
-    printf("DWT NS->S gateway switch: %u cycles, %u ns\n",
-           dwt_ns_to_s_cycles, cycles_to_ns(dwt_ns_to_s_cycles));
-    dwt_ns_to_s_cycles = measure_ns_to_s_switch();
-    printf("DWT NS->S gateway switch: %u cycles, %u ns\n",
-           dwt_ns_to_s_cycles, cycles_to_ns(dwt_ns_to_s_cycles));
+#ifdef CONTEXT_SWITCH_LATENCY
+    __asm volatile("cpsid i" ::: "memory");
+    while (1) {
+#ifdef RUN_INSIDE_VM
+        /* Stack level 1 selects TA1, two levels above CA1. */
+        dwt_ns_to_s_cycles = measure_vm_context_switch(MTOWER1);
+        __asm volatile("dmb" ::: "memory");
+        uint32_t const ca_to_ta1_cycles = *vm_ca_to_ta1_cycles;
+        vm_print_sample("CA1->TA1", ca_to_ta1_cycles);
+        vm_print_sample("TA1->CA1", dwt_ns_to_s_cycles);
+
+        /* Stack level 2 selects TA2, the direct parent of CA1. */
+        dwt_ns_to_s_cycles = measure_vm_context_switch(MTOWER2);
+        __asm volatile("dmb" ::: "memory");
+        uint32_t const ca_to_ta2_cycles = *vm_ca_to_ta2_cycles;
+        vm_print_sample("CA1->TA2", ca_to_ta2_cycles);
+        vm_print_sample("TA2->CA1", dwt_ns_to_s_cycles);
+#else
+        /* Secure prints NS->S; this return value is the following S->NS. */
+        dwt_ns_to_s_cycles = measure_ns_to_s_switch();
+        printf("DWT S->NS return: %u cycles, %u ns\n",
+               dwt_ns_to_s_cycles, cycles_to_ns(dwt_ns_to_s_cycles));
+#endif
+    }
 #endif
 
     // Tick_Counter = 0; 
@@ -347,11 +397,6 @@ while(1);//acerescentei isto para validar as interrupções do timer
 #endif
 #endif
 
-
-#ifdef CONTEXT_SWITCH_LAT
-    //Jump to secure to measure non-secure interrupt latency 
-    measure_ns_to_s_switch();
-#endif
 
     // debug_read_exception_state();
 

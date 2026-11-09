@@ -12,11 +12,20 @@
 .thumb_func
 .global _start
 _start:
+#ifdef CONTEXT_SWITCH_LATENCY
     // Capture DWT as soon as Non-secure execution starts.
     ldr r0, =0xE0001004
     ldr r0, [r0]
     ldr r1, =dwt_s_to_ns_cycles
     str r0, [r1]
+    // Stop the counter so C runtime and UART setup are not measured.
+    ldr r1, =0xE0001000
+    ldr r2, [r1]
+    bic r2, r2, #1
+    str r2, [r1]
+    dsb
+    isb
+#endif
 
     // Disable interrupts
     cpsid i
