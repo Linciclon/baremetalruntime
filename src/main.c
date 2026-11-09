@@ -113,8 +113,19 @@ static void collect_timer_latency_sample(void)
 }
 #endif
 
-// void (*crosshyp_hypercall)(unsigned int, unsigned int, unsigned int) =
-//     (void (*)(unsigned int, unsigned int, unsigned int))BAO_HC_ADDR;
+#if defined(PLAT_LPC55S69) && defined(RUN_INSIDE_VM)
+void (*crosshyp_hypercall)(unsigned int, unsigned int, unsigned int) =
+    (void (*)(unsigned int, unsigned int, unsigned int))CROSSHYP_HC_ADDR;
+#endif
+
+#if defined(CONTEXT_SWITCH_LATENCY) && defined(RUN_INSIDE_VM)
+extern uint32_t measure_vm_context_switch(uint32_t hypercall_id);
+
+/* IPC region shared by securebare and nonsecurebare in the hypervisor config. */
+#define VM_CONTEXT_SAMPLE_ADDR 0x20000000UL
+static volatile uint32_t *const vm_ns_to_s_cycles =
+    (volatile uint32_t *)VM_CONTEXT_SAMPLE_ADDR;
+#endif
 
 #ifndef PLAT_RZT2M
 
@@ -170,9 +181,30 @@ static void dwt_enable_cycle_counter(void)
 {
     DEMCR |= DEMCR_TRCENA;
     DWT_CYCCNT = 0;
-    //DWT_CTRL |= DWT_CTRL_CYCCNTENA;
-    //asm volatile("dsb\nisb" ::: "memory");
+    DWT_CTRL |= DWT_CTRL_CYCCNTENA;
+    asm volatile("dsb\nisb" ::: "memory");
 }
+
+#ifdef CONTEXT_SWITCH_LATENCY
+static uint32_t cycles_to_ns(uint32_t cycles)
+{
+    return (uint32_t)(((uint64_t)cycles * 1000000000ULL) /
+                      PLAT_DWT_FREQ);
+}
+
+/* Entered from the naked NSC veneer with CYCCNT already captured/stopped. */
+__attribute__((used, noinline))
+void secure_context_switch_sample(uint32_t cycles)
+{
+    printf("DWT NS->S switch: %u cycles, %u ns\n",
+           cycles, cycles_to_ns(cycles));
+
+    /* Start the S->NS return measurement after all UART activity. */
+    DWT_CYCCNT = 0;
+    DWT_CTRL |= DWT_CTRL_CYCCNTENA;
+    asm volatile("dsb\nisb" ::: "memory");
+}
+#endif
 //function that is called from secure_dwt_ns_to_s_probe to stall secure world and force constant secure wolrd execution
 void stall_secure_world(){
     while(1);
@@ -185,6 +217,19 @@ uint32_t secure_dwt_ns_to_s_probe(void)
         "sg\n"
         "ldr r0, =0xE0001004\n"
         "ldr r0, [r0]\n"
+#ifdef CONTEXT_SWITCH_LATENCY
+        /* End NS->S before printing, then let C start the return window. */
+        "ldr r1, =0xE0001000\n"
+        "ldr r2, [r1]\n"
+        "bic r2, r2, #1\n"
+        "str r2, [r1]\n"
+        "dsb\n"
+        "isb\n"
+        /* BL consumes the special NS-return LR, so preserve it explicitly. */
+        "push {lr}\n"
+        "bl secure_context_switch_sample\n"
+        "pop {lr}\n"
+#endif
 #ifdef NONSECURE_INTERRUPT_LATENCY
         "b stall_secure_world\n" //non-secure interrupt latency measurment 
 #endif
@@ -255,15 +300,38 @@ static void jump_to_nonsecure(void)
         "msr msp_ns, %0\n"
         "dsb\n"
         "isb\n"
+#ifdef CONTEXT_SWITCH_LATENCY
         "ldr r2, =0xE0001004\n"
         "movs r3, #0\n"
         "str r3, [r2]\n"
+        "ldr r2, =0xE0001000\n"
+        "ldr r3, [r2]\n"
+        "orr r3, r3, #1\n"
+        "str r3, [r2]\n"
+        "dsb\n"
+        "isb\n"
+#endif
         "bxns %1\n"
         :
         : "r"(ns_msp), "r"(ns_reset)
         : "r2", "r3", "memory");
 #else
+#if defined(CONTEXT_SWITCH_LATENCY) && defined(PLAT_LPC55S69)
+    /* Mask guest interrupts before BOOT as IRQ 78 may become pending while
+     * this VM is suspended.  Doing this after BOOT is already too late. */
+    asm volatile("cpsid i" ::: "memory");
+    uint32_t cycles = measure_vm_context_switch(CROSSCON_HC_BOOT);
+
+    while (1) {
+        /* Do not run printf in this resumed context. Publish the sample to
+         * the IPC page; the non-secure VM prints both directions. */
+        *vm_ns_to_s_cycles = cycles;
+        asm volatile("dmb" ::: "memory");
+        cycles = measure_vm_context_switch(CROSSCON_HC_BLNS_ID);
+    }
+#else
     crosshyp_hypercall(CROSSCON_HC_BOOT, 0, 0);
+#endif
 #endif
 
     while(1);
@@ -352,10 +420,12 @@ void main(void)
     printf("This is the secure Baremetal! \n");
     printf("#############################\n");
 
+#ifndef CONTEXT_SWITCH_LATENCY
     irq_set_handler(UART_IRQ_ID, uart_rx_handler);
     irq_set_prio(UART_IRQ_ID, IRQ_MAX_PRIO);
     irq_enable(UART_IRQ_ID);
     uart_enable_rxirq();
+#endif
 
 #ifdef SECURE_INTERRUPT_LATENCY
     irq_set_handler(TIMER_IRQ_ID, timer_handler);
@@ -378,6 +448,11 @@ void main(void)
     timer_enable();
     asm volatile("cpsie i" ::: "memory");
 #endif
+#endif
+
+#ifdef CONTEXT_SWITCH_LATENCY
+    /* DWT is configured only by Secure and remains visible in both worlds. */
+    dwt_enable_cycle_counter();
 #endif
 
 #ifdef NONSECURE_INTERRUPT_LATENCY  //interrupt latency measurment in non-secure context
